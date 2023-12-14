@@ -1,6 +1,6 @@
-# Meta Nest
+# @leanscript/quark
 
-<img src="./docs/img/logo.png" alt="Meta Nest logo" style="margin: 0 auto;" width="150px" height="150px"/>
+<img src="./docs/img/logo.png" alt="quark logo" style="margin: 0 auto;" width="150px" height="150px"/>
 
 ## Features :
 
