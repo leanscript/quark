@@ -142,3 +142,10 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+
+# Vitepress
+.docs/.vitepress/cache
+.docs/.vitepress/dist
+
+# Project related
+todo.md

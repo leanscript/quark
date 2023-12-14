@@ -1,15 +1,18 @@
 {
-  "name": "meta-nest",
+  "name": "@leanscript/quark",
   "version": "0.0.1",
   "description": "",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "keywords": ["nest", "crud", "openapi", "tools"],
   "author": "LouisHrg",
   "license": "MIT",
   "devDependencies": {
     "turbo": "^1.11.1"
+  },
+  "dependencies": {
+    "vitepress": "1.0.0-rc.32"
   }
 }
