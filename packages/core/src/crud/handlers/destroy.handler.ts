@@ -1,24 +1,25 @@
-import { plainToClass } from 'class-transformer';
-import { validate } from 'class-validator';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { NotFoundException } from '@nestjs/common';
 
-async function destroy(metaCtx, filters = [], scope = {}) {
+async function destroy(
+  metaCtx,
+  _filters = [],
+  scope = {},
+  target = metaCtx.target,
+  schema = metaCtx.schema,
+) {
   const { id } = metaCtx.meta.getRouteParams();
-  const payload = metaCtx.meta.getBody();
 
-  const obj = new metaCtx.schema();
+  const obj = new schema();
 
   const pk = obj.getPk();
   const pkQuery = {};
   pkQuery[pk] = id;
+  const scopedQuery = { ...scope, ...pkQuery };
 
-  const data = await metaCtx.meta.getOne(metaCtx.target, {
-    ...pkQuery,
-    ...scope,
-  });
+  const data = await metaCtx.meta.getOne(target, scopedQuery);
   if (!data) throw new NotFoundException();
 
-  await metaCtx.meta.deleteOne(metaCtx.target, { ...pkQuery }, metaCtx.schema);
+  await metaCtx.meta.deleteOne(target, scopedQuery);
 
   return { message: 'Resource deleted' };
 }

@@ -1,85 +1,137 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
+import {
+  DatabaseServiceInterface,
+  MetaModel,
+  QueryParams,
+  SearchServiceInterface,
+  SortParams,
+} from './interfaces';
+
+type MetaModelConstructor = new (...args: any[]) => MetaModel & {
+  syncing?: boolean;
+};
 
 @Injectable()
 export class MetaService {
   constructor(
-    @Inject('DatabaseService') private db,
-    @Inject('SearchService') private search,
-    @Inject(REQUEST) private request,
+    @Inject('DatabaseService') private db: DatabaseServiceInterface,
+    @Inject('SearchService') private search: SearchServiceInterface,
+    @Inject(REQUEST) private request: any,
   ) {}
 
-  async getReq() {
+  getReq() {
     return this.request;
   }
 
-  getRouteParams() {
-    const req = this.request;
-    return req.params;
+  getRouteParams(): QueryParams {
+    return this.request.params || {};
   }
 
   getBody() {
-    const req = this.request;
-    return req.body;
+    return this.request.body || {};
   }
 
-  getQueryParams() {
-    const req = this.request;
-    return req.query;
+  getQueryParams(): QueryParams {
+    return this.request.query || {};
   }
 
-  getQueryParam(key) {
-    const req = this.request;
-    return req.query[key] || null;
+  getQueryParam(key: string) {
+    return this.getQueryParams()[key] || null;
   }
 
-  async getMany(target, page = 1, query = {}, sort = {}) {
+  async getMany(
+    target: string,
+    page = 1,
+    query: QueryParams = {},
+    sort: SortParams = {},
+  ) {
     return await this.db.find(target, query, page, sort);
   }
 
-  async getManyWithRel(target, page = 1, query = {}, sort = {}, relation) {
+  async getManyWithRel(
+    target: string,
+    page = 1,
+    query: QueryParams = {},
+    sort: SortParams = {},
+    relation,
+  ) {
     return await this.db.findWithRel(target, query, page, sort, relation);
   }
 
-  async countRows(target, query = {}) {
+  async countRows(target: string, query: QueryParams = {}) {
     return await this.db.count(target, query);
   }
 
-  async getOne(target, query) {
+  async getOne(target: string, query: QueryParams) {
     return await this.db.findOne(target, query);
   }
 
-  async getOneWithRel(target, query, relation) {
+  async getOneWithRel(target: string, query: QueryParams, relation) {
     return await this.db.findOneWithRel(target, query, relation);
   }
 
-  async addOne(target, query, schema = null) {
-    const res = await this.db.add(target, query);
-    const inserted = await this.getOne(target, { id: res.insertedId });
+  async addOne(
+    target: string,
+    data,
+    schema: MetaModelConstructor | null = null,
+  ) {
+    const res = await this.db.add(target, data);
+    const inserted = await this.resolveInserted(target, data, res, schema);
 
-    if (schema) {
-      const obj = new schema();
-      if (obj.syncing) await this.search.indexData(target, inserted);
-    }
+    await this.syncSearch(target, inserted, schema);
 
     return inserted;
   }
 
-  async updateOne(target, query, data, schema = null) {
-    const res = await this.db.update(target, query, data);
-    const updated = { id: res.insertedId, ...data };
+  async updateOne(
+    target: string,
+    query: QueryParams,
+    data,
+    schema: MetaModelConstructor | null = null,
+  ) {
+    await this.db.update(target, query, data);
+    const updated = (await this.getOne(target, query)) || { ...query, ...data };
 
-    if (schema) {
-      const obj = new schema();
-      if (obj.syncing) await this.search.indexData(target, updated);
-    }
+    await this.syncSearch(target, updated, schema);
 
     return updated;
   }
 
-  async deleteOne(target: string, query: any, schema: any) {
-    const res = await this.db.deleteOne(target, query);
+  async deleteOne(target: string, query: QueryParams) {
+    return await this.db.deleteOne(target, query);
+  }
 
-    return res;
+  private async resolveInserted(
+    target: string,
+    data,
+    result,
+    schema: MetaModelConstructor | null,
+  ) {
+    if (!result || result.insertedId === undefined) return result || data;
+
+    const pk = this.getPrimaryKey(schema);
+    return (
+      (await this.getOne(target, { [pk]: result.insertedId })) || {
+        ...data,
+        [pk]: result.insertedId,
+      }
+    );
+  }
+
+  private getPrimaryKey(schema: MetaModelConstructor | null): string {
+    if (!schema) return 'id';
+    return new schema().getPk();
+  }
+
+  private async syncSearch(
+    target: string,
+    data,
+    schema: MetaModelConstructor | null,
+  ) {
+    if (!schema || !data) return;
+
+    const model = new schema();
+    if (model.syncing) await this.search.indexData(target, data);
   }
 }

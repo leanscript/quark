@@ -8,9 +8,13 @@
 - Validation based on schema decorators
 - Database agnostic
 - Search agnostic
+- Native SQL drivers for MySQL, PostgreSQL and SQLite
 
 ## Futures compatibles plugins :
 
+- [x] MySQL Database Service
+- [x] PostgreSQL Database Service
+- [x] SQLite Database Service
 - [ ] MongoDB Database Service
 - [ ] Meilisearch Search Service
 - [ ] Mailer Notification Service
@@ -175,6 +179,56 @@ export class DatabaseService implements DatabaseServiceInterface {
   // ...
 }
 ```
+
+#### Use a native SQL driver
+
+Quark also provides native SQL drivers built from scratch. They generate
+parameterized SQL internally and delegate execution to the native client you
+install in your app.
+
+```bash
+pnpm add pg
+pnpm add mysql2
+pnpm add better-sqlite3
+```
+
+```typescript
+import {
+  MetaModule,
+  createPostgresqlDatabaseService,
+  createMysqlDatabaseService,
+  createSqliteDatabaseService,
+} from '@quark/core';
+
+const DatabaseService = createPostgresqlDatabaseService({
+  connection: {
+    host: process.env.POSTGRES_HOST,
+    port: Number(process.env.POSTGRES_PORT || 5432),
+    user: process.env.POSTGRES_USER,
+    password: process.env.POSTGRES_PASSWORD,
+    database: process.env.POSTGRES_DATABASE,
+  },
+});
+
+// MySQL
+createMysqlDatabaseService({ connection: mysqlConnectionOptions });
+
+// SQLite
+createSqliteDatabaseService({ filename: './data/app.sqlite' });
+
+@Module({
+  imports: [
+    MetaModule.forRoot({
+      DatabaseService,
+      SearchService,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+See `.docs/sql-drivers.md` for table naming, primary keys, relations and raw SQL
+examples.
 
 #### Create your custom SearchService
 

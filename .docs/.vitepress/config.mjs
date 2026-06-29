@@ -38,8 +38,8 @@ export default defineConfig({
       {
         text: 'Available database plugins',
         items: [
+          { text: 'Native SQL drivers', link: '/sql-drivers' },
           { text: 'Mongodb', link: '/mongodb' },
-          { text: 'Sequelize', link: '/sequelize' },
         ]
       },
       {

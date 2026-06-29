@@ -1,23 +1,27 @@
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 
-async function updateOne(metaCtx, filters = [], scope = {}) {
+async function updateOne(
+  metaCtx,
+  _filters = [],
+  scope = {},
+  target = metaCtx.target,
+  schema = metaCtx.schema,
+) {
   const { id } = metaCtx.meta.getRouteParams();
   const payload = metaCtx.meta.getBody();
 
-  const target = new metaCtx.schema();
-  const pk = target.getPk();
+  const model = new schema();
+  const pk = model.getPk();
   const pkQuery = {};
   pkQuery[pk] = id;
+  const scopedQuery = { ...scope, ...pkQuery };
 
-  const data = await metaCtx.meta.getOne(metaCtx.target, {
-    ...pkQuery,
-    ...scope,
-  });
+  const data = await metaCtx.meta.getOne(target, scopedQuery);
   if (!data) throw new NotFoundException();
 
-  const obj = new metaCtx.schema({ ...payload });
+  const obj = plainToInstance(schema, payload);
 
   const errors = await validate(obj);
 
@@ -27,17 +31,15 @@ async function updateOne(metaCtx, filters = [], scope = {}) {
       errors: error.constraints,
     }));
     throw new BadRequestException(res);
-  } else {
-    const res = await metaCtx.meta.updateOne(
-      metaCtx.target,
-      { ...pkQuery },
-      payload,
-      metaCtx.schema,
-    );
-    return { message: 'updated', data: plainToClass(metaCtx.schema, res) };
   }
 
-  return { message: 'updateOne' };
+  const res = await metaCtx.meta.updateOne(
+    target,
+    scopedQuery,
+    payload,
+    schema,
+  );
+  return { message: 'updated', data: plainToInstance(schema, res) };
 }
 
 export default updateOne;

@@ -6,13 +6,18 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": ["nest", "crud", "openapi", "tools"],
+  "keywords": [
+    "nest",
+    "crud",
+    "openapi",
+    "tools"
+  ],
   "author": "LouisHrg",
   "license": "MIT",
   "devDependencies": {
-    "turbo": "^1.11.1"
+    "turbo": "^2.10.0"
   },
   "dependencies": {
-    "vitepress": "1.0.0-rc.32"
+    "vitepress": "1.6.4"
   }
 }

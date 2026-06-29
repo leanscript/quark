@@ -1,11 +1,17 @@
-import { plainToClass } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import { BadRequestException } from '@nestjs/common';
 
-async function addOne(metaCtx, filters = {}, scope: {}) {
+async function addOne(
+  metaCtx,
+  _filters = {},
+  scope = {},
+  target = metaCtx.target,
+  schema = metaCtx.schema,
+) {
   const payload = metaCtx.meta.getBody();
 
-  const obj = new metaCtx.schema({ ...payload });
+  const obj = plainToInstance(schema, payload);
 
   const errors = await validate(obj);
 
@@ -15,17 +21,11 @@ async function addOne(metaCtx, filters = {}, scope: {}) {
       errors: error.constraints,
     }));
     throw new BadRequestException(res);
-  } else {
-    const scopedPayload = { ...payload, ...scope };
-    const res = await metaCtx.meta.addOne(
-      metaCtx.target,
-      scopedPayload,
-      metaCtx.schema,
-    );
-    return { message: 'created', data: plainToClass(metaCtx.schema, res) };
   }
 
-  return { message: 'success' };
+  const scopedPayload = { ...payload, ...scope };
+  const res = await metaCtx.meta.addOne(target, scopedPayload, schema);
+  return { message: 'created', data: plainToInstance(schema, res) };
 }
 
 export default addOne;

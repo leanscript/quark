@@ -1,0 +1,40 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: quark
+      MYSQL_PASSWORD: quark
+      MYSQL_ROOT_PASSWORD: quark_root
+      MYSQL_USER: quark
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uquark -pquark --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/mysql-app/Dockerfile
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      MYSQL_DATABASE: quark
+      MYSQL_HOST: mysql
+      MYSQL_PASSWORD: quark
+      MYSQL_PORT: 3306
+      MYSQL_USER: quark
+      PORT: 3000
+    ports:
+      - "3012:3000"
+
+volumes:
+  mysql-data:

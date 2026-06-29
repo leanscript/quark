@@ -1,10 +1,16 @@
-import { Module, DynamicModule, Global } from '@nestjs/common';
+import { Module, DynamicModule, Global, Type } from '@nestjs/common';
+import { DatabaseServiceInterface, SearchServiceInterface } from './interfaces';
 import { MetaService } from './meta.service';
+
+type MetaModuleOptions = {
+  DatabaseService: Type<DatabaseServiceInterface>;
+  SearchService: Type<SearchServiceInterface>;
+};
 
 @Global()
 @Module({})
 export class MetaModule {
-  static forRoot(options: { DatabaseService; SearchService }): DynamicModule {
+  static forRoot(options: MetaModuleOptions): DynamicModule {
     const { DatabaseService, SearchService } = options;
     return {
       global: true,
