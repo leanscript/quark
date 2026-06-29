@@ -4,6 +4,7 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
 export async function createApp(): Promise<NestFastifyApplication> {
@@ -12,7 +13,20 @@ export async function createApp(): Promise<NestFastifyApplication> {
     new FastifyAdapter(),
   );
 
+  setupSwagger(app);
+
   return app;
+}
+
+function setupSwagger(app: NestFastifyApplication): void {
+  const config = new DocumentBuilder()
+    .setTitle('Quark SQLite example')
+    .setDescription('Generated Quark CRUD routes backed by SQLite.')
+    .setVersion('1.0')
+    .build();
+  const document = SwaggerModule.createDocument(app, config);
+
+  SwaggerModule.setup('api', app, document);
 }
 
 async function bootstrap(): Promise<void> {

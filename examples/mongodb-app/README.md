@@ -26,6 +26,8 @@ docker compose up --build
 Then call the app from the host:
 
 ```bash
+curl http://localhost:3014/api
+
 curl http://localhost:3014/meta/users
 
 curl 'http://localhost:3014/meta/users/64f000000000000000000001?with=profile,posts,roles&select[profile]=bio&select[posts]=title&select[roles]=name'
@@ -34,6 +36,10 @@ curl -X POST http://localhost:3014/meta/users \
   -H 'content-type: application/json' \
   -d '{"name":"Katherine Johnson","email":"katherine@example.com"}'
 ```
+
+The Swagger UI is available at `/api`, and the OpenAPI JSON document is
+available at `/api-json`. The smoke test verifies that all generated
+`@MetaController` routes are present in the OpenAPI document.
 
 The `User` model demonstrates:
 

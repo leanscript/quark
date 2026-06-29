@@ -8,6 +8,8 @@ async function main(): Promise<void> {
 
   const server = app.getHttpAdapter().getInstance();
 
+  await assertSwaggerRoutes(server);
+
   const listResponse = await server.inject({
     method: 'GET',
     url: '/meta/users',
@@ -57,6 +59,37 @@ async function main(): Promise<void> {
   console.log(readResponse.body);
 
   await app.close();
+}
+
+async function assertSwaggerRoutes(server: any): Promise<void> {
+  const swaggerResponse = await server.inject({
+    method: 'GET',
+    url: '/api-json',
+  });
+
+  if (swaggerResponse.statusCode !== 200) {
+    throw new Error(`GET /api-json failed: ${swaggerResponse.body}`);
+  }
+
+  const paths = swaggerResponse.json().paths || {};
+  const requiredRoutes: Array<[string, string]> = [
+    ['/meta/users', 'get'],
+    ['/meta/users', 'post'],
+    ['/meta/users/{id}', 'get'],
+    ['/meta/users/{id}', 'patch'],
+    ['/meta/users/{id}', 'delete'],
+  ];
+  const missingRoutes = requiredRoutes.filter(
+    ([path, method]) => !paths[path]?.[method],
+  );
+
+  if (missingRoutes.length > 0) {
+    throw new Error(
+      `Swagger is missing routes: ${missingRoutes
+        .map(([path, method]) => `${method.toUpperCase()} ${path}`)
+        .join(', ')}`,
+    );
+  }
 }
 
 function assertRelations(user: any): void {

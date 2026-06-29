@@ -15,7 +15,8 @@
 - [x] MySQL Database Service
 - [x] PostgreSQL Database Service
 - [x] SQLite Database Service
-- [ ] MongoDB Database Service
+- [x] MongoDB Database Service
+- [ ] Swagger doc
 - [ ] Meilisearch Search Service
 - [ ] Mailer Notification Service
 - [ ] Slack Notification Service

@@ -35,6 +35,8 @@ corepack pnpm --filter @quark/example-sqlite-app start
 Then call:
 
 ```bash
+curl http://localhost:3000/api
+
 curl http://localhost:3000/meta/users
 
 curl 'http://localhost:3000/meta/users/1?with=profile,posts,roles&select[profile]=bio&select[posts]=title&select[roles]=name'
@@ -43,6 +45,10 @@ curl -X POST http://localhost:3000/meta/users \
   -H 'content-type: application/json' \
   -d '{"name":"Katherine Johnson","email":"katherine@example.com"}'
 ```
+
+The Swagger UI is available at `/api`, and the OpenAPI JSON document is
+available at `/api-json`. The smoke test verifies that all generated
+`@MetaController` routes are present in the OpenAPI document.
 
 The `User` model demonstrates:
 
