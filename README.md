@@ -191,6 +191,7 @@ install in your app.
 pnpm add pg
 pnpm add mysql2
 pnpm add better-sqlite3
+pnpm add mongodb
 ```
 
 ```typescript
@@ -199,6 +200,7 @@ import {
   createPostgresqlDatabaseService,
   createMysqlDatabaseService,
   createSqliteDatabaseService,
+  createMongoDatabaseService,
 } from "@quark/core";
 
 const DatabaseService = createPostgresqlDatabaseService({
@@ -217,6 +219,12 @@ createMysqlDatabaseService({ connection: mysqlConnectionOptions });
 // SQLite
 createSqliteDatabaseService({ filename: "./data/app.sqlite" });
 
+// MongoDB
+createMongoDatabaseService({
+  uri: process.env.MONGODB_URI,
+  database: process.env.MONGODB_DATABASE,
+});
+
 @Module({
   imports: [
     MetaModule.forRoot({
@@ -228,9 +236,9 @@ createSqliteDatabaseService({ filename: "./data/app.sqlite" });
 export class AppModule {}
 ```
 
-See `.docs/sql-drivers.md` for table naming, primary keys, native relations
-(`one-to-one`, `one-to-many`, `many-to-many`) with selected relation columns,
-and raw SQL examples.
+See `.docs/sql-drivers.md` and `.docs/mongodb.md` for naming, primary keys,
+native relations (`one-to-one`, `one-to-many`, `many-to-many`) with selected
+relation columns, and raw query examples.
 
 #### Create your custom SearchService
 

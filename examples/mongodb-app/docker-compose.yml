@@ -1,0 +1,36 @@
+services:
+  mongo:
+    # MongoDB 8.0+ currently refuses to start on Linux kernel 6.19+.
+    # Keep the example on 7.0 until SERVER-121912 is resolved in Docker images.
+    image: mongo:7.0
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' | grep 1",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  app:
+    build:
+      context: ../..
+      dockerfile: examples/mongodb-app/Dockerfile
+    depends_on:
+      mongo:
+        condition: service_healthy
+    environment:
+      HOST: 0.0.0.0
+      MONGODB_DATABASE: quark
+      MONGODB_URI: mongodb://mongo:27017
+      PORT: 3000
+    ports:
+      - "3014:3000"
+
+volumes:
+  mongo-data:
