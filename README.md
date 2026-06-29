@@ -26,26 +26,25 @@
 #### Configure your app
 
 ```typescript
-
 // app.module.ts
-import { Module } from '@nestjs/common';
-import { DatabaseService } from './services/db.service';
-import { SearchService } from './services/search.service';
-import { UsersModule } from './users/users.module';
-import { MetaModule } from 'meta-nest';
+import { Module } from "@nestjs/common";
+import { DatabaseService } from "./services/db.service";
+import { SearchService } from "./services/search.service";
+import { UsersModule } from "./users/users.module";
+import { MetaModule } from "meta-nest";
 
 @Module({
   imports: [
     UsersModule, // ie we will use UsersModule
-    MetaModule.forRoot({ // Configure the module with your custom DatabaseService & SearchService
+    MetaModule.forRoot({
+      // Configure the module with your custom DatabaseService & SearchService
       DatabaseService,
-      SearchService
+      SearchService,
     }),
   ],
-  providers: [ DatabaseService, SearchService ], // Import your custom DatabaseService & SearchService
+  providers: [DatabaseService, SearchService], // Import your custom DatabaseService & SearchService
 })
 export class AppModule {}
-
 ```
 
 #### Configure your module
@@ -71,26 +70,25 @@ export class UsersModule {}
 
 ```typescript
 // users/users.controller.ts
-import { Controller } from '@nestjs/common';
+import { Controller } from "@nestjs/common";
 
-import { User } from './user.schema';
-import { ApiGroup } from '../core/decorators/api-group.decorator';
-import { MetaController } from '../core/decorators/meta.decorator';
+import { User } from "./user.schema";
+import { ApiGroup } from "../core/decorators/api-group.decorator";
+import { MetaController } from "../core/decorators/meta.decorator";
 
 // Use ApiGroup instead of ApiTags for swagger api tagging
-@ApiGroup('Users')
+@ApiGroup("Users")
 @Controller()
 // MetaController enable you to setup easily your generic CRUD api
 @MetaController({
-  key: 'users',
+  key: "users",
   schema: User,
-  routes: ['GET', 'POST', 'PATCH', 'DESTROY', 'ACTIONS'],
+  routes: ["GET", "POST", "PATCH", "DESTROY", "ACTIONS"],
 })
 export class UsersController {
   constructor() {}
   // ...
 }
-
 ```
 
 #### Inject your Database & Search services
@@ -120,16 +118,15 @@ export class UsersService {
 // users/users.service.ts
 
 // You can use class-validator & class-transformer on your schema
-import { Exclude, Transform } from 'class-transformer';
-import { IsEmail, Length } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { Exclude, Transform } from "class-transformer";
+import { IsEmail, Length } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
-import { ObjectId } from 'mongodb';
-import { PrimaryKey, MetaModel, } from 'meta-nest';
+import { ObjectId } from "mongodb";
+import { PrimaryKey, MetaModel } from "meta-nest";
 
 // You need to extends MetaModel to use your schema with meta-nest
 export class User extends MetaModel {
-
   // PrimaryKey let you specify the pk of your schema
   // By default meta-nest will target 'id' property
   @PrimaryKey()
@@ -137,18 +134,24 @@ export class User extends MetaModel {
   _id: ObjectId;
 
   @Length(3, 10)
-  @ApiProperty({ example: "Foo Bar", description: 'The name of the user' })
+  @ApiProperty({ example: "Foo Bar", description: "The name of the user" })
   name: string;
 
   @IsEmail()
-  @ApiProperty({ example: "api-generator@mail.com", description: 'The email of the user' })
+  @ApiProperty({
+    example: "api-generator@mail.com",
+    description: "The email of the user",
+  })
   email: string;
 
   @Exclude()
   password: string;
 
   @Length(3, 10)
-  @ApiProperty({ example: "Xx_Foo_Bar_xX", description: 'The username of the user' })
+  @ApiProperty({
+    example: "Xx_Foo_Bar_xX",
+    description: "The username of the user",
+  })
   username: string;
 
   constructor(partial: Partial<User>) {
@@ -159,11 +162,9 @@ export class User extends MetaModel {
 }
 ```
 
-
 #### Check your api
 
 Go to /api to check your api swagger.
-
 
 #### Create your custom DatabaseService
 
@@ -171,8 +172,8 @@ To use your custom DatabaseService with meta-nest your service need to implement
 As long as your service follows the interface, you can make any DB driver works with meta-nest.
 
 ```typescript
-import { Injectable, Inject } from '@nestjs/common';
-import { DatabaseServiceInterface } from 'meta-nest'
+import { Injectable, Inject } from "@nestjs/common";
+import { DatabaseServiceInterface } from "meta-nest";
 
 @Injectable()
 export class DatabaseService implements DatabaseServiceInterface {
@@ -198,7 +199,7 @@ import {
   createPostgresqlDatabaseService,
   createMysqlDatabaseService,
   createSqliteDatabaseService,
-} from '@quark/core';
+} from "@quark/core";
 
 const DatabaseService = createPostgresqlDatabaseService({
   connection: {
@@ -214,7 +215,7 @@ const DatabaseService = createPostgresqlDatabaseService({
 createMysqlDatabaseService({ connection: mysqlConnectionOptions });
 
 // SQLite
-createSqliteDatabaseService({ filename: './data/app.sqlite' });
+createSqliteDatabaseService({ filename: "./data/app.sqlite" });
 
 @Module({
   imports: [
@@ -227,18 +228,18 @@ createSqliteDatabaseService({ filename: './data/app.sqlite' });
 export class AppModule {}
 ```
 
-See `.docs/sql-drivers.md` for table naming, primary keys, relations and raw SQL
-examples.
+See `.docs/sql-drivers.md` for table naming, primary keys, native relations
+(`one-to-one`, `one-to-many`, `many-to-many`) with selected relation columns,
+and raw SQL examples.
 
 #### Create your custom SearchService
-
 
 To use your custom SearchService with meta-nest your service need to implement SearchServiceInterface.
 As long as your service follows the interface, you can make any Search Engine works with meta-nest.
 
 ```typescript
-import { Injectable, Inject } from '@nestjs/common';
-import { SearchServiceInterface } from 'meta-nest'
+import { Injectable, Inject } from "@nestjs/common";
+import { SearchServiceInterface } from "meta-nest";
 
 @Injectable()
 export class SearchService implements SearchServiceInterface {
@@ -246,61 +247,34 @@ export class SearchService implements SearchServiceInterface {
 }
 ```
 
-
 #### Configure multiple endpoint per controller
 
 ```typescript
 // users/users.controller.ts
-import { Controller } from '@nestjs/common';
+import { Controller } from "@nestjs/common";
 
-import { User } from './user.schema';
-import { ApiGroup } from '../core/decorators/api-group.decorator';
-import { MetaController } from '../core/decorators/meta.decorator';
+import { User } from "./user.schema";
+import { ApiGroup } from "../core/decorators/api-group.decorator";
+import { MetaController } from "../core/decorators/meta.decorator";
 
 // Use ApiGroup instead of ApiTags for swagger api tagging
-@ApiGroup('Users')
+@ApiGroup("Users")
 @Controller()
 // You can scope your controller and using multiple MetaController
 @MetaController({
-  key: 'teachers',
+  key: "teachers",
   schema: User,
-  scope: { type: 'teacher' },
-  routes: ['GET', 'POST', 'PATCH', 'DESTROY', 'ACTIONS'],
+  scope: { type: "teacher" },
+  routes: ["GET", "POST", "PATCH", "DESTROY", "ACTIONS"],
 })
 @MetaController({
-  key: 'students',
+  key: "students",
   schema: User,
-  scope: { type: 'student' },
-  routes: ['GET', 'POST', 'PATCH', 'DESTROY', 'ACTIONS'],
+  scope: { type: "student" },
+  routes: ["GET", "POST", "PATCH", "DESTROY", "ACTIONS"],
 })
 export class UsersController {
   constructor() {}
   // ...
 }
-
 ```
-
-
-db.products.aggregate([
-  { "$match": { "id": 1 }},
-  { "$lookup": {
-    "from": "productfeatures",
-    "let": { "productId": "$id" },
-    "pipeline": [
-      { "$match": { "$expr": { "$eq": ["$$productId", "$productId"] }}},
-      { "$lookup": {
-        "from": "features",
-        "let": { "featureId": "$featureId" },
-        "pipeline": [
-          { "$match": { "$expr": { "$eq": ["$id", "$$featureId"] }}}
-        ],
-        "as": "productfeatures"
-      }},
-      { "$project": {
-        "value": 1,
-        "feature": { "$arrayElemAt": ["$productfeatures.name", 0] }
-      }}
-    ],
-    "as": "productfeatures"
-  }}
-])

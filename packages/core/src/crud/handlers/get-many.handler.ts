@@ -1,5 +1,5 @@
 import { plainToInstance } from 'class-transformer';
-import { BadRequestException } from '@nestjs/common';
+import { parseRelationLoads } from '../relations';
 
 async function getMany(metaCtx, filters = [], scope = {}, target, schema) {
   const { page, sort } = metaCtx.meta.getQueryParams();
@@ -28,8 +28,17 @@ async function getMany(metaCtx, filters = [], scope = {}, target, schema) {
   }
 
   const obj = new schema();
+  const relationLoads = relationship
+    ? parseRelationLoads(
+        obj,
+        relationship,
+        (relation) =>
+          metaCtx.meta.getQueryParam(`select[${relation}]`) ||
+          metaCtx.meta.getQueryParam(`fields[${relation}]`),
+      )
+    : [];
 
-  if (!relationship) {
+  if (relationLoads.length === 0) {
     const data = await metaCtx.meta.getMany(
       target,
       currentPage,
@@ -60,15 +69,12 @@ async function getMany(metaCtx, filters = [], scope = {}, target, schema) {
       data: parsedData,
     };
   } else {
-    const options = obj.loadRelation(relationship);
-    if (!options) throw new BadRequestException("Relationship doesn't exist");
-
     const data = await metaCtx.meta.getManyWithRel(
       target,
       currentPage,
       { ...parsedFilters, ...scope },
       parsedSort,
-      { target: relationship, ...options },
+      relationLoads,
     );
     const total = await metaCtx.meta.countRows(target, {
       ...parsedFilters,

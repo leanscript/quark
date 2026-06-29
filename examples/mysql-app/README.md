@@ -5,8 +5,12 @@ and runs with Docker Compose.
 
 The compose stack starts:
 
-- `mysql`: MySQL 8.4 with a seeded `quark.users` table.
+- `mysql`: MySQL 8.4 with seeded `users`, `profiles`, `posts`, `roles` and
+  `user_roles` tables.
 - `app`: Nest app exposing Quark-generated CRUD routes.
+
+The app also applies the example schema on startup, so existing Docker volumes
+created before the relation tables were added are upgraded automatically.
 
 ## Run with Docker Compose
 
@@ -21,10 +25,21 @@ Then call the app from the host:
 ```bash
 curl http://localhost:3012/meta/users
 
+curl 'http://localhost:3012/meta/users/1?with=profile,posts,roles&select[profile]=bio&select[posts]=title&select[roles]=name'
+
 curl -X POST http://localhost:3012/meta/users \
   -H 'content-type: application/json' \
   -d '{"name":"Dorothy Vaughan","email":"dorothy@example.com"}'
 ```
+
+The `User` model demonstrates:
+
+- `profile`: one-to-one relation on `profiles.user_id`.
+- `posts`: one-to-many relation on `posts.user_id`.
+- `roles`: many-to-many relation through `user_roles`.
+
+The relation request selects only `bio`, `title` and `name` in the nested
+objects.
 
 MySQL is also exposed on `localhost:3307`:
 
@@ -34,7 +49,8 @@ mysql -h 127.0.0.1 -P 3307 -u quark -pquark quark
 
 ## Reset the database
 
-The seed SQL runs only when the MySQL volume is first created. To reset:
+The app creates missing example tables at startup. To wipe all data and start
+from a fresh MySQL volume:
 
 ```bash
 docker compose down -v

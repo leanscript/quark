@@ -2,7 +2,8 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import {
   DatabaseServiceInterface,
   QueryParams,
-  RelationMetadata,
+  RelationLoad,
+  RelationLoadInput,
   SortParams,
 } from '../../interfaces';
 import { SqlDatabaseServiceOptions, SqlDriver, SqlParameter } from './types';
@@ -50,10 +51,10 @@ export class SqlDatabaseService
     query: QueryParams,
     page: number,
     sort: SortParams,
-    relation: RelationMetadata & { target: string },
+    relation: RelationLoadInput,
   ): Promise<any> {
     const rows = await this.find(target, query, page, sort);
-    return this.attachRelation(target, rows, relation);
+    return this.attachRelations(target, rows, relation);
   }
 
   async findOne(target: string, query: QueryParams): Promise<any> {
@@ -64,12 +65,12 @@ export class SqlDatabaseService
   async findOneWithRel(
     target: string,
     query: QueryParams,
-    relation: RelationMetadata & { target: string },
+    relation: RelationLoadInput,
   ): Promise<any> {
     const row = await this.findOne(target, query);
     if (!row) return null;
 
-    const rows = await this.attachRelation(target, [row], relation);
+    const rows = await this.attachRelations(target, [row], relation);
     return rows[0] || null;
   }
 
@@ -239,81 +240,151 @@ export class SqlDatabaseService
     sort: SortParams = {},
     limit?: number,
     offset?: number,
+    columns?: string[],
   ): Promise<any[]> {
     const where = this.where(query);
     const orderBy = this.orderBy(sort);
     const paging = this.paging(limit, offset);
     const result = await this.driver.query(
-      `SELECT * FROM ${this.table(target)}${where.sql}${orderBy.sql}${paging.sql}`,
+      `SELECT ${this.columns(columns)} FROM ${this.table(target)}${where.sql}${orderBy.sql}${paging.sql}`,
       [...where.params, ...paging.params],
     );
 
     return result.rows;
   }
 
-  private async attachRelation(
+  private async attachRelations(
     target: string,
     rows: any[],
-    relation: RelationMetadata & { target: string },
+    relationInput: RelationLoadInput,
   ): Promise<any[]> {
     const baseRows = rows.map((row) => ({ ...row }));
     if (baseRows.length === 0) return baseRows;
 
+    let rowsWithRelations = baseRows;
+
+    for (const relation of this.normalizeRelations(relationInput)) {
+      rowsWithRelations = await this.attachRelation(
+        target,
+        rowsWithRelations,
+        relation,
+      );
+    }
+
+    return rowsWithRelations;
+  }
+
+  private async attachRelation(
+    target: string,
+    rows: any[],
+    relation: RelationLoad,
+  ): Promise<any[]> {
     if (relation.type === 'belongsTo') {
-      return this.attachBelongsTo(baseRows, relation);
+      return this.attachBelongsTo(rows, relation);
     }
 
     if (relation.type === 'hasMany') {
-      return this.attachHasMany(target, baseRows, relation);
+      return this.attachHasMany(target, rows, relation);
     }
 
-    return this.attachManyToMany(target, baseRows, relation);
+    if (relation.type === 'oneToOne') {
+      return this.attachOneToOne(target, rows, relation);
+    }
+
+    return this.attachManyToMany(target, rows, relation);
   }
 
   private async attachBelongsTo(
     rows: any[],
-    relation: RelationMetadata & { target: string },
+    relation: RelationLoad,
   ): Promise<any[]> {
     const foreignKeys = this.uniqueValues(rows, relation.property);
-    const relatedRows = await this.selectRows(relation.target, {
-      [this.primaryKey(relation.target)]: foreignKeys,
-    });
+    const relatedPrimaryKey = this.primaryKey(relation.target);
+    const relatedRows = await this.selectRows(
+      relation.target,
+      { [relatedPrimaryKey]: foreignKeys },
+      {},
+      undefined,
+      undefined,
+      this.requiredColumns(relation, [relatedPrimaryKey]),
+    );
     const relatedById = this.indexBy(
       relatedRows,
       this.primaryKey(relation.target),
     );
+    const property = this.relationProperty(relation);
 
     return rows.map((row) => ({
       ...row,
-      [relation.target]:
+      [property]: this.projectRow(
         relatedById.get(String(row[relation.property])) || null,
+        relation.select,
+      ),
     }));
   }
 
   private async attachHasMany(
     target: string,
     rows: any[],
-    relation: RelationMetadata & { target: string },
+    relation: RelationLoad,
   ): Promise<any[]> {
     if (!relation.fk) return rows;
 
     const primaryKey = this.primaryKey(target);
     const ids = this.uniqueValues(rows, primaryKey);
-    const relatedRows = await this.selectRows(relation.target, {
-      [relation.fk]: ids,
-    });
+    const relatedRows = await this.selectRows(
+      relation.target,
+      { [relation.fk]: ids },
+      {},
+      undefined,
+      undefined,
+      this.requiredColumns(relation, [relation.fk]),
+    );
     const grouped = this.groupBy(relatedRows, relation.fk);
+    const property = this.relationProperty(relation);
 
     return rows.map((row) => ({
       ...row,
-      [relation.property]: grouped.get(String(row[primaryKey])) || [],
+      [property]: this.projectRows(
+        grouped.get(String(row[primaryKey])) || [],
+        relation.select,
+      ),
+    }));
+  }
+
+  private async attachOneToOne(
+    target: string,
+    rows: any[],
+    relation: RelationLoad,
+  ): Promise<any[]> {
+    if (!relation.fk) return rows;
+
+    const primaryKey = this.primaryKey(target);
+    const ids = this.uniqueValues(rows, primaryKey);
+    const relatedRows = await this.selectRows(
+      relation.target,
+      { [relation.fk]: ids },
+      {},
+      undefined,
+      undefined,
+      this.requiredColumns(relation, [relation.fk]),
+    );
+    const grouped = this.groupBy(relatedRows, relation.fk);
+    const property = this.relationProperty(relation);
+
+    return rows.map((row) => ({
+      ...row,
+      [property]: this.projectRow(
+        (grouped.get(String(row[primaryKey])) || [])[0] || null,
+        relation.select,
+      ),
     }));
   }
 
   private async attachManyToMany(
     target: string,
     rows: any[],
-    relation: RelationMetadata & { target: string },
+    relation: RelationLoad,
   ): Promise<any[]> {
     if (!relation.collection || !relation.ownKey || !relation.fk) return rows;
 
@@ -324,20 +395,66 @@ export class SqlDatabaseService
       [relation.ownKey]: ids,
     });
     const relatedIds = this.uniqueValues(pivots, relation.fk);
-    const relatedRows = await this.selectRows(relation.target, {
-      [relatedPrimaryKey]: relatedIds,
-    });
+    const relatedRows = await this.selectRows(
+      relation.target,
+      { [relatedPrimaryKey]: relatedIds },
+      {},
+      undefined,
+      undefined,
+      this.requiredColumns(relation, [relatedPrimaryKey]),
+    );
     const relatedById = this.indexBy(relatedRows, relatedPrimaryKey);
     const pivotsByOwner = this.groupBy(pivots, relation.ownKey);
+    const property = this.relationProperty(relation);
 
     return rows.map((row) => {
       const ownerPivots = pivotsByOwner.get(String(row[primaryKey])) || [];
       const related = ownerPivots
         .map((pivot) => relatedById.get(String(pivot[relation.fk])))
-        .filter(Boolean);
+        .filter(Boolean)
+        .map((relatedRow) => this.projectRow(relatedRow, relation.select));
 
-      return { ...row, [relation.property]: related };
+      return { ...row, [property]: related };
     });
+  }
+
+  private normalizeRelations(relationInput: RelationLoadInput): RelationLoad[] {
+    return (Array.isArray(relationInput) ? relationInput : [relationInput])
+      .filter(Boolean)
+      .map((relation) => ({
+        ...relation,
+        target: relation.target || relation.property,
+      }));
+  }
+
+  private requiredColumns(
+    relation: RelationLoad,
+    columns: string[],
+  ): string[] | undefined {
+    if (!relation.select?.length) return undefined;
+    return this.uniqueColumns([...relation.select, ...columns]);
+  }
+
+  private relationProperty(relation: RelationLoad): string {
+    if (relation.as) return relation.as;
+    if (relation.type === 'belongsTo') return relation.target;
+    return relation.property;
+  }
+
+  private projectRows(rows: any[], columns?: string[]): any[] {
+    return rows.map((row) => this.projectRow(row, columns));
+  }
+
+  private projectRow(row: any, columns?: string[]): any {
+    if (!row || !columns?.length) return row;
+
+    return columns.reduce((projected, column) => {
+      if (Object.prototype.hasOwnProperty.call(row, column)) {
+        projected[column] = row[column];
+      }
+
+      return projected;
+    }, {});
   }
 
   private where(query: QueryParams = {}) {
@@ -427,6 +544,15 @@ export class SqlDatabaseService
     return this.driver.quoteIdentifier(this.tableNameResolver(target));
   }
 
+  private columns(columns?: string[]): string {
+    if (!columns?.length) return '*';
+
+    const uniqueColumns = this.uniqueColumns(columns);
+    if (uniqueColumns.length === 0) return '*';
+
+    return uniqueColumns.map((column) => this.column(column)).join(', ');
+  }
+
   private column(column: string): string {
     return this.driver.quoteIdentifier(column);
   }
@@ -459,5 +585,11 @@ export class SqlDatabaseService
       groups.set(groupKey, [...(groups.get(groupKey) || []), row]);
       return groups;
     }, new Map<string, any[]>());
+  }
+
+  private uniqueColumns(columns: string[]): string[] {
+    return Array.from(
+      new Set(columns.map((column) => String(column).trim()).filter(Boolean)),
+    );
   }
 }

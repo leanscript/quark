@@ -4,6 +4,7 @@ import {
   DatabaseServiceInterface,
   MetaModel,
   QueryParams,
+  RelationLoadInput,
   SearchServiceInterface,
   SortParams,
 } from './interfaces';
@@ -54,7 +55,7 @@ export class MetaService {
     page = 1,
     query: QueryParams = {},
     sort: SortParams = {},
-    relation,
+    relation: RelationLoadInput,
   ) {
     return await this.db.findWithRel(target, query, page, sort, relation);
   }
@@ -67,7 +68,11 @@ export class MetaService {
     return await this.db.findOne(target, query);
   }
 
-  async getOneWithRel(target: string, query: QueryParams, relation) {
+  async getOneWithRel(
+    target: string,
+    query: QueryParams,
+    relation: RelationLoadInput,
+  ) {
     return await this.db.findOneWithRel(target, query, relation);
   }
 

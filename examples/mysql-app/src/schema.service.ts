@@ -1,3 +1,21 @@
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { createPool } from 'mysql2/promise';
+import { mysqlConnection } from './database';
+
+@Injectable()
+export class SchemaService implements OnApplicationBootstrap {
+  async onApplicationBootstrap(): Promise<void> {
+    const pool = createPool({ ...mysqlConnection, multipleStatements: true });
+
+    try {
+      await pool.query(schemaSql);
+    } finally {
+      await pool.end();
+    }
+  }
+}
+
+const schemaSql = `
 CREATE TABLE IF NOT EXISTS users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   name VARCHAR(80) NOT NULL,
@@ -54,3 +72,4 @@ INSERT IGNORE INTO user_roles (user_id, role_id) VALUES
   (1, 1),
   (1, 2),
   (2, 2);
+`;

@@ -1,3 +1,21 @@
+import { Injectable, OnApplicationBootstrap } from '@nestjs/common';
+import { Pool } from 'pg';
+import { postgresConnection } from './database';
+
+@Injectable()
+export class SchemaService implements OnApplicationBootstrap {
+  async onApplicationBootstrap(): Promise<void> {
+    const pool = new Pool(postgresConnection);
+
+    try {
+      await pool.query(schemaSql);
+    } finally {
+      await pool.end();
+    }
+  }
+}
+
+const schemaSql = `
 CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   name VARCHAR(80) NOT NULL,
@@ -60,3 +78,4 @@ SELECT setval(pg_get_serial_sequence('users', 'id'), (SELECT MAX(id) FROM users)
 SELECT setval(pg_get_serial_sequence('profiles', 'id'), (SELECT MAX(id) FROM profiles));
 SELECT setval(pg_get_serial_sequence('posts', 'id'), (SELECT MAX(id) FROM posts));
 SELECT setval(pg_get_serial_sequence('roles', 'id'), (SELECT MAX(id) FROM roles));
+`;

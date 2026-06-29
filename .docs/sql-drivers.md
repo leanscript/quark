@@ -171,28 +171,57 @@ GET /meta/users?sort=-created_at,name
 
 ## Relations
 
-The SQL driver resolves relations with additional parameterized queries.
+The SQL driver resolves relations with additional parameterized queries. It
+supports `BelongsTo`, `HasMany`, `OneToOne` and `ManyToMany`.
 
 ```ts
 class User extends MetaModel {
-  @HasMany('posts', 'user_id')
+  @OneToOne('profiles', 'user_id', { select: ['id', 'bio'] })
+  profile: Profile;
+
+  @HasMany('posts', 'user_id', { select: ['id', 'title'] })
   posts: Post[];
+
+  @ManyToMany('user_roles', 'user_id', 'role_id', {
+    target: 'roles',
+    select: ['id', 'name'],
+  })
+  roles: Role[];
+}
+
+class Post extends MetaModel {
+  @BelongsTo('users', { as: 'author', select: ['id', 'name'] })
+  user_id: string;
 }
 ```
 
 Then:
 
 ```http
-GET /meta/users?with=posts
+GET /meta/users?with=profile,posts,roles
 ```
 
-`BelongsTo`, `HasMany` and `ManyToMany` are supported with the metadata already
-created by Quark decorators. For many-to-many relations, the decorator argument
-is treated as the join table:
+You can override selected relation columns per request:
+
+```http
+GET /meta/users?with=posts,roles&select[posts]=id,title&select[roles]=name
+```
+
+`fields[relation]` is accepted as an alias for `select[relation]`.
+
+When a relation uses `select`, Quark still reads the internal join columns it
+needs, such as foreign keys or related primary keys, but strips them from the
+returned relation objects unless you explicitly selected them.
+
+For many-to-many relations, the first decorator argument is the join table.
+Use `target` when the related table/model name is different from the property
+name:
 
 ```ts
 class Product extends MetaModel {
-  @ManyToMany('product_features', 'product_id', 'feature_id')
+  @ManyToMany('product_features', 'product_id', 'feature_id', {
+    target: 'features',
+  })
   features: Feature[];
 }
 ```

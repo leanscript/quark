@@ -71,8 +71,9 @@ describe('SqlDatabaseService', () => {
 
   it('attaches has-many relations without mutating base rows', async () => {
     const driver = new FakeDriver();
+    const baseRow = { id: '1', name: 'Ada' };
     driver.results = [
-      { rows: [{ id: '1', name: 'Ada' }] },
+      { rows: [baseRow] },
       {
         rows: [
           { id: '10', userId: '1', title: 'First' },
@@ -106,5 +107,125 @@ describe('SqlDatabaseService', () => {
         ],
       },
     ]);
+    expect(baseRow).toEqual({ id: '1', name: 'Ada' });
+  });
+
+  it('selects only requested columns on has-many relations', async () => {
+    const driver = new FakeDriver();
+    driver.results = [
+      { rows: [{ id: '1', name: 'Ada' }] },
+      {
+        rows: [
+          { id: '10', userId: '1', title: 'First' },
+          { id: '11', userId: '1', title: 'Second' },
+        ],
+      },
+    ];
+    const service = new SqlDatabaseService({ driver });
+
+    const result = await service.findWithRel(
+      'users',
+      {},
+      1,
+      {},
+      {
+        id: 'posts:posts:hasMany',
+        property: 'posts',
+        target: 'posts',
+        fk: 'userId',
+        type: 'hasMany',
+        select: ['id', 'title'],
+      },
+    );
+
+    expect(result).toEqual([
+      {
+        id: '1',
+        name: 'Ada',
+        posts: [
+          { id: '10', title: 'First' },
+          { id: '11', title: 'Second' },
+        ],
+      },
+    ]);
+    expect(driver.queries[1]).toEqual({
+      sql: 'SELECT "id", "title", "userId" FROM "posts" WHERE "userId" IN (?)',
+      params: ['1'],
+    });
+  });
+
+  it('attaches one-to-one relations with selected columns', async () => {
+    const driver = new FakeDriver();
+    driver.results = [
+      { rows: [{ id: '1', name: 'Ada' }] },
+      { rows: [{ id: '20', userId: '1', bio: 'Compiler friend' }] },
+    ];
+    const service = new SqlDatabaseService({ driver });
+
+    const result = await service.findWithRel(
+      'users',
+      {},
+      1,
+      {},
+      {
+        id: 'profile:profiles:oneToOne',
+        property: 'profile',
+        target: 'profiles',
+        fk: 'userId',
+        type: 'oneToOne',
+        select: ['bio'],
+      },
+    );
+
+    expect(result).toEqual([
+      {
+        id: '1',
+        name: 'Ada',
+        profile: { bio: 'Compiler friend' },
+      },
+    ]);
+    expect(driver.queries[1]).toEqual({
+      sql: 'SELECT "bio", "userId" FROM "profiles" WHERE "userId" IN (?)',
+      params: ['1'],
+    });
+  });
+
+  it('attaches many-to-many relations with selected columns', async () => {
+    const driver = new FakeDriver();
+    driver.results = [
+      { rows: [{ id: '1', name: 'Ada' }] },
+      { rows: [{ userId: '1', roleId: '7' }] },
+      { rows: [{ id: '7', name: 'Admin', internal: 'hidden' }] },
+    ];
+    const service = new SqlDatabaseService({ driver });
+
+    const result = await service.findWithRel(
+      'users',
+      {},
+      1,
+      {},
+      {
+        id: 'roles:user_roles:manyToMany',
+        property: 'roles',
+        target: 'roles',
+        collection: 'user_roles',
+        ownKey: 'userId',
+        fk: 'roleId',
+        type: 'manyToMany',
+        select: ['name'],
+      },
+    );
+
+    expect(result).toEqual([
+      {
+        id: '1',
+        name: 'Ada',
+        roles: [{ name: 'Admin' }],
+      },
+    ]);
+    expect(driver.queries[2]).toEqual({
+      sql: 'SELECT "name", "id" FROM "roles" WHERE "id" IN (?)',
+      params: ['7'],
+    });
   });
 });

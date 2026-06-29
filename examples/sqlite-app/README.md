@@ -22,6 +22,7 @@ corepack pnpm --filter @quark/example-sqlite-app smoke
 The smoke test boots Nest without opening a port and calls:
 
 - `GET /meta/users`
+- `GET /meta/users/1?with=profile,posts,roles&select[profile]=bio&select[posts]=title&select[roles]=name`
 - `POST /meta/users`
 - `GET /meta/users/:id`
 
@@ -36,10 +37,21 @@ Then call:
 ```bash
 curl http://localhost:3000/meta/users
 
+curl 'http://localhost:3000/meta/users/1?with=profile,posts,roles&select[profile]=bio&select[posts]=title&select[roles]=name'
+
 curl -X POST http://localhost:3000/meta/users \
   -H 'content-type: application/json' \
   -d '{"name":"Katherine Johnson","email":"katherine@example.com"}'
 ```
+
+The `User` model demonstrates:
+
+- `profile`: one-to-one relation on `profiles.user_id`.
+- `posts`: one-to-many relation on `posts.user_id`.
+- `roles`: many-to-many relation through `user_roles`.
+
+The relation request selects only `bio`, `title` and `name` in the nested
+objects.
 
 ## Files
 

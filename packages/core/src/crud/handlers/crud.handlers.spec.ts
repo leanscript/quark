@@ -1,7 +1,7 @@
 import { IsString } from 'class-validator';
 import addOne from './add-one.handler';
 import getOne from './get-one.handler';
-import { MetaModel } from '../../interfaces';
+import { HasMany, MetaModel, OneToOne } from '../../interfaces';
 
 class UserModel extends MetaModel {
   id: string;
@@ -10,6 +10,14 @@ class UserModel extends MetaModel {
   name: string;
 
   type: string;
+}
+
+class UserWithRelationsModel extends UserModel {
+  @HasMany('posts', 'userId')
+  posts: any[];
+
+  @OneToOne('profiles', 'userId', { as: 'profile' })
+  profile: any;
 }
 
 describe('CRUD handlers', () => {
@@ -65,5 +73,53 @@ describe('CRUD handlers', () => {
       id: '1',
     });
     expect(result.data).toBeInstanceOf(UserModel);
+  });
+
+  it('reads one record with multiple selected relations', async () => {
+    const query = {
+      with: 'posts,profile',
+      'select[posts]': 'id,title',
+      'select[profile]': 'bio',
+    };
+    const metaCtx = {
+      meta: {
+        getRouteParams: jest.fn().mockReturnValue({ id: '1' }),
+        getQueryParam: jest.fn((key) => query[key] || null),
+        getOneWithRel: jest.fn().mockResolvedValue({
+          id: '1',
+          name: 'Ada',
+          posts: [{ id: '10', title: 'First' }],
+          profile: { bio: 'Compiler friend' },
+        }),
+      },
+    };
+
+    const result = await getOne(
+      metaCtx,
+      {},
+      {},
+      'users',
+      UserWithRelationsModel,
+    );
+
+    expect(metaCtx.meta.getOneWithRel).toHaveBeenCalledWith(
+      'users',
+      { id: '1' },
+      [
+        expect.objectContaining({
+          property: 'posts',
+          target: 'posts',
+          type: 'hasMany',
+          select: ['id', 'title'],
+        }),
+        expect.objectContaining({
+          property: 'profile',
+          target: 'profiles',
+          type: 'oneToOne',
+          select: ['bio'],
+        }),
+      ],
+    );
+    expect(result.data).toBeInstanceOf(UserWithRelationsModel);
   });
 });
