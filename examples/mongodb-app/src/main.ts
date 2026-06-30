@@ -24,7 +24,9 @@ function setupSwagger(app: NestFastifyApplication): void {
     .setDescription('Generated Quark CRUD routes backed by MongoDB.')
     .setVersion('1.0')
     .build();
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, config, {
+    autoTagControllers: false,
+  });
 
   SwaggerModule.setup('api', app, document);
 }

@@ -90,6 +90,19 @@ async function assertSwaggerRoutes(server: any): Promise<void> {
         .join(', ')}`,
     );
   }
+
+  const duplicatedUserTags = requiredRoutes.filter(([path, method]) => {
+    const tags = paths[path]?.[method]?.tags || [];
+    return tags.includes('Users') && tags.includes('Meta : users');
+  });
+
+  if (duplicatedUserTags.length > 0) {
+    throw new Error(
+      `Swagger duplicates user routes under multiple tags: ${duplicatedUserTags
+        .map(([path, method]) => `${method.toUpperCase()} ${path}`)
+        .join(', ')}`,
+    );
+  }
 }
 
 function assertRelations(user: any): void {

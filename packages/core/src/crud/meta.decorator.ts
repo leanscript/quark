@@ -1,6 +1,12 @@
 import { Inject, RequestMethod } from '@nestjs/common';
-import { ApiTags, ApiResponse } from '@nestjs/swagger';
+import { ApiExtraModels, ApiTags, ApiResponse } from '@nestjs/swagger';
 import { getMany, getOne, addOne, updateOne, destroy } from './handlers/';
+import {
+  ensureMetaOpenApiSchema,
+  getManyResponseSchema,
+  getOneResponseSchema,
+  mutationResponseSchema,
+} from './openapi';
 
 import {
   INTERCEPTORS_METADATA,
@@ -25,6 +31,7 @@ type GeneratedRoute = {
   action: (...args: any[]) => any;
   name: string;
   args?: string;
+  body?: boolean;
   guards: any[];
   decorators: any[];
 };
@@ -42,6 +49,8 @@ export function MetaController(options?: any): ClassDecorator {
   if (!options?.key || !options?.schema) {
     throw new Error('MetaController requires `key` and `schema` options.');
   }
+
+  ensureMetaOpenApiSchema(options.schema);
 
   const injector = Inject(MetaService);
 
@@ -62,7 +71,7 @@ export function MetaController(options?: any): ClassDecorator {
         ...decorators,
         ApiResponse({
           status: 200,
-          type: options.schema,
+          schema: getManyResponseSchema(options.schema),
           description: 'Get many resource',
         }),
       ],
@@ -78,7 +87,7 @@ export function MetaController(options?: any): ClassDecorator {
         ...decorators,
         ApiResponse({
           status: 200,
-          type: options.schema,
+          schema: getOneResponseSchema(options.schema),
           description: 'Get one resource',
         }),
         ApiResponse({ status: 404, description: 'Resource not found' }),
@@ -93,15 +102,15 @@ export function MetaController(options?: any): ClassDecorator {
       path: `/meta/${options.key}`,
       action: addOne,
       name: `addOne_${options.key}`,
+      body: true,
       guards: parsedRoutes['post'].guards || [],
       decorators: [
         ...decorators,
         ApiResponse({
-          status: 200,
-          type: options.schema,
+          status: 201,
+          schema: mutationResponseSchema(options.schema, 'created'),
           description: 'Create one resource',
         }),
-        ApiResponse({ status: 404, description: 'Resource not found' }),
       ],
     });
   }
@@ -114,12 +123,13 @@ export function MetaController(options?: any): ClassDecorator {
       action: updateOne,
       name: `updateOne_${options.key}`,
       args: 'id',
+      body: true,
       guards: parsedRoutes['patch'].guards || [],
       decorators: [
         ...decorators,
         ApiResponse({
           status: 200,
-          type: options.schema,
+          schema: mutationResponseSchema(options.schema, 'updated'),
           description: 'Update one resource',
         }),
         ApiResponse({ status: 404, description: 'Resource not found' }),
@@ -184,23 +194,62 @@ export function MetaController(options?: any): ClassDecorator {
         target.prototype[route.name],
       );
       Reflect.decorate(
-        [...route.decorators, ApiTags(`Meta : ${options.key}`)],
+        [
+          ...route.decorators,
+          ApiExtraModels(options.schema),
+          ApiTags(`Meta : ${options.key}`),
+        ],
         target.prototype[route.name],
       );
-      if (route.args) {
-        // Workaround since ApiParam is not applied reliably on generated methods.
-        Reflect.defineMetadata(
-          'swagger/apiParameters',
-          [
-            {
-              name: route.args,
-              type: 'string',
-              description: 'The resource id',
-            },
-          ],
-          target.prototype[route.name],
-        );
-      }
+      appendSwaggerParameters(target.prototype[route.name], route, options);
     });
   };
+}
+
+function appendSwaggerParameters(method, route: GeneratedRoute, options: any) {
+  const existingParameters = Reflect.getMetadata(
+    'swagger/apiParameters',
+    method,
+  );
+  const parameters = [];
+
+  if (
+    route.args &&
+    !hasSwaggerParameter(existingParameters, 'path', route.args)
+  ) {
+    parameters.push({
+      in: 'path',
+      name: route.args,
+      required: true,
+      type: 'string',
+      description: 'The resource id',
+    });
+  }
+
+  if (route.body && !hasSwaggerParameter(existingParameters, 'body', 'body')) {
+    parameters.push({
+      in: 'body',
+      name: 'body',
+      required: true,
+      type: options.schema,
+    });
+  }
+
+  if (parameters.length === 0) return;
+
+  Reflect.defineMetadata(
+    'swagger/apiParameters',
+    [...(existingParameters || []), ...parameters],
+    method,
+  );
+}
+
+function hasSwaggerParameter(
+  parameters,
+  location: string,
+  name: string,
+): boolean {
+  return (parameters || []).some(
+    (parameter) => parameter.in === location && parameter.name === name,
+  );
 }

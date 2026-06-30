@@ -4,22 +4,35 @@ import {
   FastifyAdapter,
   NestFastifyApplication,
 } from '@nestjs/platform-fastify';
-import { IsString } from 'class-validator';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { IsEmail, IsOptional, IsString, Length } from 'class-validator';
 import request from 'supertest';
 import {
   DatabaseServiceInterface,
+  HasMany,
   MetaController,
   MetaModel,
   MetaModule,
+  PrimaryKey,
   QueryParams,
   SearchServiceInterface,
 } from '../src';
 
 class UserModel extends MetaModel {
+  @PrimaryKey()
+  @IsOptional()
   id: string;
 
   @IsString()
+  @Length(2, 80)
   name: string;
+
+  @IsOptional()
+  @IsEmail()
+  email?: string;
+
+  @HasMany('posts', 'userId', { select: ['id', 'title'] })
+  posts?: any[];
 }
 
 @Controller()
@@ -155,5 +168,63 @@ describe('MetaController (e2e)', () => {
       .expect(({ body }) => {
         expect(body.data).toMatchObject({ id: '2', name: 'Grace' });
       });
+  });
+
+  it('documents generated routes with inferred entity schemas', () => {
+    const document = SwaggerModule.createDocument(
+      app,
+      new DocumentBuilder().setTitle('Quark test').build(),
+      { autoTagControllers: false },
+    ) as any;
+    const userSchema = document.components?.schemas?.UserModel;
+    const getManySchema =
+      document.paths['/meta/users'].get.responses['200'].content[
+        'application/json'
+      ].schema;
+    const postOperation = document.paths['/meta/users'].post;
+
+    expect(userSchema).toMatchObject({
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        name: { type: 'string', minLength: 2, maxLength: 80 },
+        email: { type: 'string', format: 'email' },
+        posts: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'number' },
+              title: { type: 'string' },
+            },
+          },
+        },
+      },
+      required: ['name'],
+    });
+    expect(getManySchema).toMatchObject({
+      type: 'object',
+      properties: {
+        meta: { type: 'object' },
+        data: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/UserModel' },
+        },
+      },
+    });
+    expect(
+      postOperation.requestBody.content['application/json'].schema,
+    ).toEqual({
+      $ref: '#/components/schemas/UserModel',
+    });
+    expect(
+      postOperation.responses['201'].content['application/json'].schema,
+    ).toMatchObject({
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'created' },
+        data: { $ref: '#/components/schemas/UserModel' },
+      },
+    });
   });
 });
